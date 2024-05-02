@@ -11,9 +11,8 @@
 #define ARG_MAX_SIZE 1024
 
 typedef struct car {
-  int id;
-  char road;
   int priority;
+  int time;
 }car;
 
 // fonction de débug générée par ia 
@@ -45,26 +44,72 @@ void displayHelp() {
   printf("\t-a, --arguments suite de chiffres et de lettres \n");
 }
 
+int islegit(char arg) {
+  if (arg == 'A' 
+      || arg == 'a'
+      || arg == 'R'
+      || arg == 'r'
+      || arg == 'C'
+      || arg == 'c'
+      || arg == 'e'
+      || arg == 'E'
+      || arg == 'J'
+      || arg == 'j') 
+  {
+    return 1;
+  }
+  else return 0;
+}
 
-void parseCars(char* args, int argSize) {
+
+void parseCars(car* carList, char* args, int argSize, char previous) {
   for (int i=0; i<argSize; ++i) {
-    //Detect upper case
-    int upper = 0;
-    if (isupper(args[i]) == 0) upper = 0;
-    else upper = 1;
     
     //detect digits
-    switch (isdigit(args[i]) == 0) {
-      case 1 :
+    int digit = 0;
+    if (isdigit(args[i]) == 0) {
+      switch (previous) {
+        default: 
+          debug_log("ERREUR : Mauvaise entrée d'arguments");
+          return;
+        case 'a' :
+          carList[0][num_count++]->time = atoi(&str[i]);
+          break;
+        case 'r' :
+          carList[1][num_count++]->time = atoi(&str[i]);
+          break;
+        case 'c' :
+          carList[2][num_count++]->time = atoi(&str[i]);
+          break;
+        case 'e' :
+          carList[3][num_count++]->time = atoi(&str[i]);
+          break;
+        case 'j' :
+          carList[4][num_count++]->time = atoi(&str[i]);
+          break;
+      }
+      while (isdigit(str[i])) {
+        i++;
+      }
+
+    }
+    else if (islegit(args[i])) {
+      debug_log("car cheked");
+      debug_log(args[i]);
+      if (isupper(args[i])) 
+
+    }
+
+
         
-    } 
   }
 }
 
 int main(int argc, char *argv[]) {
 
   
-  //---------------------------------- Prise en compte des arguments ------------------------------
+  //------------------------
+  //---------- Prise en compte des arguments ------------------------------
 
   //Définition des variables principales
   int ord = 0;
