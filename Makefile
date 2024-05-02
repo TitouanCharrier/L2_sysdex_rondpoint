@@ -1,5 +1,5 @@
 main: gestionTrafic.c 
-	gcc gestionTrafic.c -o gestionTrafic 
 	clear
+	gcc gestionTrafic.c -o gestionTrafic -lpthread
 	
 
