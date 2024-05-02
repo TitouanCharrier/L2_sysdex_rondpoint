@@ -13,6 +13,7 @@
 #define ARG_MAX_SIZE 1024
 
 typedef struct car {
+  int id;
   int priority;
   int time;
   char road;
@@ -39,8 +40,20 @@ void displayHelp() {
   printf("\t-a, --arguments suite de chiffres et de lettres \n");
 }
 
-int parseCars(car* carList, char* args, int argSize) {
+int compareTime(const void *a, const void *b) {
+    const car *carA = (const car *)a;
+    const car *carB = (const car *)b;
+    return carA->time - carB->time;
+}
 
+void printCarList(car* carList, int carNum) {
+    for (int i=0; i<carNum; ++i) {
+      printf("V%d ", carList[i].id);
+    }
+    printf("\n");
+}
+
+int parseCars(car* carList, char* args, int argSize) {
   int carNum = -1;
 
   for (int i=0; i<argSize; ++i) {
@@ -49,10 +62,12 @@ int parseCars(car* carList, char* args, int argSize) {
     if (isdigit(args[i]) == 0 ) {
       carNum ++;
       carList[carNum].time = 1;
+      carList[carNum].id = carNum;
+      printf("La voiture %d Arrive\n", carNum+1);
       switch (args[i]) {
         default: 
           printf("ERREUR : Mauvaise entrée d'arguments");
-          return;
+          return 0;
         case 'a' :
           carList[carNum].road = 'a';
           carList[carNum].priority = 0;
@@ -102,19 +117,76 @@ int parseCars(car* carList, char* args, int argSize) {
       while (isdigit(args[i]) != 0) {
         ++i;
       }
-      i--;
+      --i;
     }
   }
   return carNum+1;
 }
 
+int* sortCarList(car* carList, int* order, int carNum, int ord, int pri) {
+  
+  // 1 0
+  if (ord && !pri) {
+    for(int i=0; i<carNum; ++i) {
+      order[i] = carList[i].id;
+    }
+    return order;
+  }
+  // 1 1  
+  else if (ord && pri) {
+    int orderCount = 0;
+    for(int i=0; i<carNum; ++i) {
+      if (carList[i].priority) {
+        order[orderCount] = carList[i].id;
+        ++orderCount;
+      }
+    }
+    for(int i=0; i<carNum; ++i) {
+      if (!carList[i].priority) {
+        order[orderCount] = carList[i].id;
+        ++orderCount;
+      }
+    }
+    return order;
+  }
+  // 0 1
+  else if (!ord && pri) {
+    int orderCount = 0;
+    qsort(carList, carNum, sizeof(car), compareTime);
+    for(int i=0; i<carNum; ++i) {
+      if (carList[i].priority) {
+        order[orderCount] = carList[i].id;
+        ++orderCount;
+      }
+    }
+    for(int i=0; i<carNum; ++i) {
+      if (!carList[i].priority) {
+        order[orderCount] = carList[i].id;
+        ++orderCount;
+      }
+    }
+    return order;
+  }
+  // O O 
+  else if (!ord && !pri) {
+    int orderCount = 0;
+    qsort(carList, carNum, sizeof(car), compareTime);
+    for(int i=0; i<carNum; ++i) {
+      order[orderCount] = carList[i].id;
+      ++orderCount;
+    }
+    return order;
+  }
+  exit(EXIT_FAILURE);
+
+}
+
 void* carFunc( void* arg) {
   int id = *((int *)arg);
-  printf("La voiture %d Arrive\n", id);
   sem_wait(&round);
-  printf("La voiture %d Traverse\n", id);
+  printf("La voiture %d Traverse\n", id+1);
   sem_post(&round);
-  printf("La voiture %d Sort\n", id);
+  printf("La voiture %d Sort\n", id+1);
   pthread_exit(NULL);
 }
 
@@ -132,7 +204,7 @@ int main(int argc, char *argv[]) {
   char* args;
   int carNum;
 
-  while ((opt = getopt(argc, argv, "hrsq:a:")) != -1) {
+  while ((opt = getopt(argc, argv, "hso:p:a:")) != -1) {
     switch (opt) {
       case 'h' :
         displayHelp();
@@ -148,17 +220,18 @@ int main(int argc, char *argv[]) {
 
       case 'p':
         pri = atoi(optarg);
+        break;
 
       case 'a':
         argSize = strlen(optarg);
-        args = malloc(argSize * sizeof(char));
-        sprintf(args,optarg);
-
+        args = malloc((argSize + 1) * sizeof(char)); 
+        strcpy(args, optarg);
+        break;
     }
 
   }
   
-  if (ord > 1 || ord < 0 || pri < 0 || pri > 1) {
+  if (ord > 1 || ord < 0 || pri < 0 || pri > 1 || !argSize) {
     displayHelp();
     return 0;
   }
@@ -166,35 +239,50 @@ int main(int argc, char *argv[]) {
   // ------------------------------------------- Début Programme -------------------------------
 
   //Initialisation de la liste
-  car* carList = malloc(argSize * sizeof(car*));
-
+  car* carList = malloc(argSize * sizeof(car));
+  
   //Remplissage de la liste
   carNum = parseCars(carList, args, argSize);
+  if (!carNum) return 1;
+
+  //Copie de la Liste
+  car* saveList = malloc(carNum * sizeof(car));
+  for (int i = 0; i < carNum; i++) {
+        saveList[i] = carList[i];
+    }
+  //Initialisation de la liste d'ordre
+  int* order = malloc(carNum * sizeof(int));
+
+  //Remplissage de la liste d'ordre
+  sortCarList(carList, order, carNum, ord, pri);
 
   //Initialisation du sémaphore
   sem_init(&round, 0, 1);
-
-  //Initialisation de la liste des id
-  int thread_id[carNum];
 
   //Initialisation des threads
   pthread_t threads[carNum];
 
   //creation des threads
   for (int i = 0; i < carNum; ++i) {
-    thread_id[i] = i;
-    pthread_create(&threads[i], NULL, carFunc, (void*)&thread_id[i]);
+    pthread_create(&threads[i], NULL, carFunc, (void*)&order[i]);
   }
 
   //attende de la fin des threads
   for (int i = 0; i < carNum; ++i) {
     pthread_join(threads[i], NULL);
   }
+  
+  printf("\n");
+  printf("Diagramme de Gantt :\n");
+  for (int i=0; i<carNum; ++i) {
+    for(int j=0; j<saveList[order[i]].time; ++j) {
+      printf("V%d|", order[i]+1);
+    }
+  }
+  printf("\n");
 
-
-
-
-  printf("%s\n", args);
-  printf("%d\n", argSize);
-  printCar(carList, carNum);
+  free(carList);
+  free(args);
+  free(order);
+  exit(EXIT_SUCCESS);
 }
